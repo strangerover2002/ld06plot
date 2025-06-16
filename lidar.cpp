@@ -1,17 +1,4 @@
-/*
- * Slamtec LIDAR Display for OpenGL
- * 
- * This code reads point cloud data from a Slamtec RPLIDAR Device and
- * displays the output on an OpenGL display in realtime.
- * 
- * Author: Jason A. Cox - https://github.com/jasonacox/OpenGL-LIDAR-Display
- * Date: 2021 July 31
- * 
- * Requires: 
- *      OpenGL (framework)
- *      GLUT (framework)
- *      Slamtec RPLIDAR SDK:  https://github.com/Slamtec/rplidar_sdk 
- */
+#include <thread>
 
 // Turn off GL Deprecation warnings
 #define GL_SILENCE_DEPRECATION
@@ -96,10 +83,6 @@ void line(int x1, int y1, int x2, int y2, float width, color c)
 #define _countof(_Array) (int)(sizeof(_Array) / sizeof(_Array[0]))
 #endif
 
-#ifdef _WIN32
-#include <Windows.h>
-#define delay(x)   ::Sleep(x)
-#else
 #include <unistd.h>
 static inline void delay(_word_size_t ms){
     while (ms>=1000){
@@ -109,68 +92,42 @@ static inline void delay(_word_size_t ms){
     if (ms!=0)
         usleep(ms*1000);
 }
-#endif
 
-using namespace rp::standalone::rplidar;
-
-bool checkRPLIDARHealth(RPlidarDriver * drv)
-{
-#if 0
-    u_result     op_result;
-    rplidar_response_device_health_t healthinfo;
-
-
-    op_result = drv->getHealth(healthinfo);
-    if (IS_OK(op_result)) { // the macro IS_OK is the preperred way to judge whether the operation is succeed.
-        printf("RPLidar health status : %d\n", healthinfo.status);
-        if (healthinfo.status == RPLIDAR_STATUS_ERROR) {
-            fprintf(stderr, "Error, rplidar internal error detected. Please reboot the device to retry.\n");
-            // enable the following code if you want rplidar to be reboot by software
-            // drv->reset();
-            return false;
-        } else {
-            return true;
-        }
-
-    } else {
-        fprintf(stderr, "Error, cannot retrieve the lidar health code: %x\n", op_result);
-        return false;
-    }
-#else
-    return true;
-#endif
-}
+int task();
 
 /*
  * MAIN FUNCTIONS
  */
 
 // GLOBALS 
-RPlidarDriver * drv;
-const char * opt_com_path = NULL;
-_u32         defbaudrateArray[2] = {115200, 256000};
-_u32        *baudrateArray = defbaudrateArray;
-_u32         opt_com_baudrate = 0;
 u_result     op_result;
 
 // RENDER - Pull data from LIDAR and render to display
-void renderScreen(void){
+void renderScreen(void)
+{
     glClear (GL_COLOR_BUFFER_BIT);
-    float theta = 0.0;
-    float dist = 0.1;
+    static float theta = 0.0;
+    static float dist = 0.1;
     int quality = 0;
 
     // Fetch data from LIDAR
-    rplidar_response_measurement_node_hq_t nodes[8192];
-    size_t   count = _countof(nodes);
+    //rplidar_response_measurement_node_hq_t nodes[8192];
+    //size_t   count = _countof(nodes);
 
     //op_result = drv->grabScanDataHq(nodes, count);
-    if (IS_OK(op_result)) {
-        //drv->ascendScanData(nodes, count);
-        for (int pos = 0; pos < (int)count ; ++pos) {
-            theta = (360-((nodes[pos].angle_z_q14 * 90.f / (1 << 14)))/360)*2*M_PI;
-            dist = (nodes[pos].dist_mm_q2/4.0f)*SCALE;
-            quality = nodes[pos].quality;
+    int count = 10;
+    //if (IS_OK(op_result))
+    {
+        for (int pos = 0; pos < (int)count ; ++pos)
+        {
+            //theta = (360-((nodes[pos].angle_z_q14 * 90.f / (1 << 14)))/360)*2*M_PI;
+            //dist = (nodes[pos].dist_mm_q2/4.0f)*SCALE;
+            //quality = nodes[pos].quality;
+            theta += 0.1;
+            if(theta >= 360.0)theta=0;;
+            dist  += 0.5;
+            if(dist  >=  10)dist=0.5;
+            quality = 0;
             // Display
             if(quality == 0) {
                 point_polar(theta, dist, SCREENX/2, SCREENY/2, 7, RED);
@@ -187,20 +144,13 @@ void renderScreen(void){
     // Intercept request to stop and end gracefully
     if (ctrl_c_pressed){ 
         printf(" Received - Stopping - Shutting down LIDAR\n");
-        //drv->stop();
-        //drv->stopMotor();
-        //RPlidarDriver::DisposeDriver(drv);
-        //drv = NULL;
         exit(0);
     }
 }
 
 // MAIN
-int main(int argc, char** argv) {
-
-    // Trap Ctrl-C
-    signal(SIGINT, ctrlc);
-
+int main(int argc, char** argv)
+{
     // Initialize OpenGL and display
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_SINGLE |GLUT_RGB);
@@ -210,108 +160,19 @@ int main(int argc, char** argv) {
     glClearColor (1.0, 1.0, 1.0, 0.0);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    //gluOrtho2D(0, SCREENX, 0, SCREENY);
+    glOrtho(0, SCREENX, 0, SCREENY, 0, 1);
     glClear (GL_COLOR_BUFFER_BIT);
 
-    printf("LIDAR OpenGL Display for Slamtec RPLIDAR Device\n"
-           "Using RPLIDAR SDK Version: " RPLIDAR_SDK_VERSION "\n");
+    std::thread t1(task);
 
-    // Optional - read serial port from the command line...
-    if (argc>1) opt_com_path = argv[1]; 
+    // Start scanning and render loop
+    printf("Launching OpenGL Window\n");
+    glutDisplayFunc(renderScreen);
+    glutIdleFunc(renderScreen);
+    // Enter continuous loop
+    glutMainLoop();
 
-    size_t baudRateArraySize = (sizeof(baudrateArray))/ (sizeof(baudrateArray[0]));
-    // Optional - read baud rate from the command line if specified...
-    if (argc>2)
-    {
-        opt_com_baudrate = strtoul(argv[2], NULL, 10);
-        if (opt_com_baudrate == 0) {
-           printf("Could not convert %s to unsigned long", argv[2]);
-           exit(3);
-        }
-        baudrateArray = &opt_com_baudrate;
-        baudRateArraySize = 1;
-    }
-
-    // Use default if not specified
-    if (!opt_com_path) {
-        opt_com_path = PORT;
-    }
-
-    // Create the RPLIDAR SDK driver instance
-    //drv = RPlidarDriver::CreateDriver(DRIVER_TYPE_SERIALPORT);
-    //if (!drv) {
-    //    printf("insufficent memory, exit\n");
-    //    exit(2);
-    //}
-    
-    // Grab device info
-    rplidar_response_device_info_t devinfo;
-    bool connectSuccess = false;
-    size_t i;
-#if 0
-    if(!drv)
-        drv = RPlidarDriver::CreateDriver(DRIVER_TYPE_SERIALPORT);
-
-    for(i = 0; i < baudRateArraySize; ++i)
-    {
-        if(IS_OK(drv->connect(opt_com_path, baudrateArray[i])))
-        {
-            op_result = drv->getDeviceInfo(devinfo);
-
-            if (IS_OK(op_result)) 
-            {
-                connectSuccess = true;
-                break;
-            }
-            else
-            {
-                delete drv;
-                drv = NULL;
-            }
-        }
-    }
-
-    if (!connectSuccess) {
-        fprintf(stderr, "Error, cannot bind to the specified serial port %s.\n"
-            , opt_com_path);
-        RPlidarDriver::DisposeDriver(drv);
-        drv = NULL;
-        return 0;
-    }
-
-    // Display RPLIDAR Info
-    printf("Connected via %s at %d baud\n", opt_com_path, baudrateArray[i]);
-    printf("RPLIDAR S/N: ");
-    for (int pos = 0; pos < 16 ;++pos) {
-        printf("%02X", devinfo.serialnum[pos]);
-    }
-    printf("\n"
-            "Firmware Ver: %d.%02d\n"
-            "Hardware Rev: %d\n"
-            , devinfo.firmware_version>>8
-            , devinfo.firmware_version & 0xFF
-            , (int)devinfo.hardware_version);
-#endif
-    // Check health of device
-    //if (checkRPLIDARHealth(drv))
-    {
-        // Device is good - start
-        //drv->startMotor();
-
-        // Start scanning and render loop
-        printf("Launching OpenGL Window\n");
-        //drv->startScan(0,1);
-        glutDisplayFunc(renderScreen);
-        glutIdleFunc(renderScreen);
-        // Enter continuous loop
-        glutMainLoop();
-
-        // Shutdown
-        //drv->stop();
-        //drv->stopMotor();
-    }
-    //RPlidarDriver::DisposeDriver(drv);
-    //drv = NULL;
+    t1.join();
     return 0;
 }
 
