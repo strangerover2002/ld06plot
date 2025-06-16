@@ -125,8 +125,7 @@ void renderScreen(void)
             //quality = nodes[pos].quality;
             theta += 0.1;
             if(theta >= 360.0)theta=0;;
-            dist  += 0.5;
-            if(dist  >=  10)dist=0.5;
+            dist  = 100;
             quality = 0;
             // Display
             if(quality == 0) {
