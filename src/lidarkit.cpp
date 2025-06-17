@@ -140,8 +140,7 @@ void LidarKit::thread_loop()
         }
 
         // read bytes, convert to words
-        if(packet[0] != 0x54)
-        	logger("sync");
+
         //uint16_t radar_speed_word   = static_cast<uint16_t>(packet[2]) 
         //                            + (static_cast<uint16_t>(packet[3])<<8);
         uint16_t start_angle_word   = static_cast<uint16_t>(packet[4]) 
@@ -172,7 +171,7 @@ void LidarKit::thread_loop()
             int this_conf = packet[j+2];
             double this_angle = start_angle + i*step;
 
-            LidarPoint p(this_angle, this_dist, this_conf, timestamp);
+            LidarPoint p(360-this_angle, this_dist, this_conf, timestamp);
             scoped_lock lg(points_mtx);
             if(this_angle < 360.0){
             	this->points.push_back(p);

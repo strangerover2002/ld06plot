@@ -56,6 +56,7 @@ color RED(1.0,0.0,0.0);
 color GREEN(0.0,1.0,0.0);
 color BLUE(0.0,0.0,1.0);
 color c(0.0,0.0,1.0);
+color GRAY(0.8,0.8,0.8);
 
 void point_polar(float deg, float r, int offsetx, int offsety, float size, color c)
 {
@@ -80,6 +81,12 @@ void line(int x1, int y1, int x2, int y2, float width, color c)
     glEnd();
 }
 
+void axis()
+{
+    line(SCREENX/2, 10, SCREENX/2, SCREENY-10, 2, GRAY);
+    line(10, SCREENY/2, SCREENX-10, SCREENY/2, 2, GRAY);
+}
+
 int task();
 
 /*
@@ -93,6 +100,7 @@ extern LP_t lp[];
 void renderScreen(void)
 {
     glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    axis();
 
     for (int pos = 0; pos < (int)360 ; pos++)
     {
@@ -133,6 +141,7 @@ int main(int argc, char** argv)
     printf("Launching OpenGL Window\n");
     glutDisplayFunc(renderScreen);
     glutIdleFunc(renderScreen);
+
     // Enter continuous loop
     glutMainLoop();
 
