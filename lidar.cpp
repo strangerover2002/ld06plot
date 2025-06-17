@@ -5,9 +5,9 @@
 
 // Settings 
 #define PORT "/dev/USB0"   // macOS UART for RPLIDAR
-#define SCALE 0.1   // Distance scale for screen
-#define SCREENX 800 // Size of Display window
-#define SCREENY 500 
+#define SCALE 1   // Distance scale for screen
+#define SCREENX 1000 // Size of Display window
+#define SCREENY 1000
 #define STARTX 100  // Coordinates to place window
 #define STARTY 100
 
@@ -20,6 +20,10 @@
 #include <stdlib.h>
 #include "include/rplidar.h" //RPLIDAR sdk
 #include <signal.h>
+#include <string.h>
+
+#include "LD06Kit/util.hpp"
+
 
 // Function to flag ctrl-c
 bool ctrl_c_pressed;
@@ -52,11 +56,13 @@ color::color( float rV, float gV, float bV)
 color RED(1.0,0.0,0.0);
 color GREEN(0.0,1.0,0.0);
 color BLUE(0.0,0.0,1.0);
+color c(0.0,0.0,1.0);
 
-void point_polar(float theta, float r, int offsetx, int offsety, float size, color c)
+void point_polar(float deg, float r, int offsetx, int offsety, float size, color c)
 {
-    int x = r * cos(theta) + offsetx;
-    int y = r * sin(theta) + offsety;
+	float rad = (deg * 3.1415926) / 180;
+    int x = r * cos(rad) + offsetx;
+    int y = r * sin(rad) + offsety;
     glPointSize(size);
     glColor3f(c.r, c.g, c.b);
     glBegin(GL_POINTS);
@@ -102,44 +108,21 @@ int task();
 // GLOBALS 
 u_result     op_result;
 
+extern LP_t lp[];
+
 // RENDER - Pull data from LIDAR and render to display
 void renderScreen(void)
 {
-    glClear (GL_COLOR_BUFFER_BIT);
-    static float theta = 0.0;
-    static float dist = 0.1;
-    int quality = 0;
+    glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // Fetch data from LIDAR
-    //rplidar_response_measurement_node_hq_t nodes[8192];
-    //size_t   count = _countof(nodes);
-
-    //op_result = drv->grabScanDataHq(nodes, count);
-    int count = 10;
-    //if (IS_OK(op_result))
+    for (int pos = 0; pos < (int)360 ; pos++)
     {
-        for (int pos = 0; pos < (int)count ; ++pos)
-        {
-            //theta = (360-((nodes[pos].angle_z_q14 * 90.f / (1 << 14)))/360)*2*M_PI;
-            //dist = (nodes[pos].dist_mm_q2/4.0f)*SCALE;
-            //quality = nodes[pos].quality;
-            theta += 0.1;
-            if(theta >= 360.0)theta=0;;
-            dist  = 100;
-            quality = 0;
-            // Display
-            if(quality == 0) {
-                point_polar(theta, dist, SCREENX/2, SCREENY/2, 7, RED);
-            }
-            else {
-                point_polar(theta, dist, SCREENX/2, SCREENY/2, 3, BLUE);
-            }
-            // printf("\r > Data: %f %f %d      ",theta,dist,quality);
-        }
+        //if(lp[pos].confidence > 200)
+        	//c.b = lp[pos].confidence/200;
+        point_polar(lp[pos].angle, lp[pos].distance, SCREENX/2, SCREENY/2, 2, c);
     }
     // Render
     glFlush();
-
     // Intercept request to stop and end gracefully
     if (ctrl_c_pressed){ 
         printf(" Received - Stopping - Shutting down LIDAR\n");

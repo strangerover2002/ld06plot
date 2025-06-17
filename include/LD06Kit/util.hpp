@@ -19,3 +19,12 @@ struct LidarPoint {
 /// For printing LidarPoint structures to C++ streams.
 ///
 std::ostream& operator<<(std::ostream& os, LidarPoint& p);
+
+
+typedef struct LP
+{
+    float angle;        ///< point angle in degrees
+    float distance;     ///< point distance in meters
+    int confidence;     ///< confidence of reading (generally >200 is OK)
+    int timestamp;      ///< timestamp in milliseconds (resets after 65536 ms)
+}LP_t;

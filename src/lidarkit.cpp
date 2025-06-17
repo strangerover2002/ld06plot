@@ -101,7 +101,15 @@ void LidarKit::reset_device()
 {
     tcflush(this->fd, TCIOFLUSH);
 }
-
+/* uint8_t   header
+ * uint8_t   ver_len
+ * uint16_t  speed
+ * uint16_t  start_angle
+ * uint24_t  point[12]
+ * uint16_t	 end_angle
+ * uint16_t  time_stamp
+ * uint8_t   crc8
+ */
 void LidarKit::thread_loop()
 {
     vector<uint8_t> packet(PACKET_LEN, 0);
@@ -158,7 +166,7 @@ void LidarKit::thread_loop()
         double step = (end_angle >= start_angle)
                     ? (end_angle - start_angle) / (NUM_POINTS - 1)
                     : ((end_angle + 360.0) - start_angle) / (NUM_POINTS - 1);
-        
+        //printf("[%5.2f:%5.2f ]",start_angle,step);
         // parse intermediate points
         for (size_t i = 0; i < NUM_POINTS; i++) {
             size_t j = 6 + 3*i;
@@ -166,14 +174,18 @@ void LidarKit::thread_loop()
             uint16_t this_dist_word = static_cast<uint16_t>(packet[j])
                                     + (static_cast<uint16_t>(packet[j+1])<<8);
         
-            double this_dist = this_dist_word / 1000.0;
+            double this_dist = this_dist_word / 10.0;
             int this_conf = packet[j+2];
             double this_angle = start_angle + i*step;
 
             LidarPoint p(this_angle, this_dist, this_conf, timestamp);
             scoped_lock lg(points_mtx);
-            this->points.push_back(p);
+            if(this_angle < 360.0){
+                //printf("%05.2f:%4d ",this_angle,(int)this_dist_word);
+            	this->points.push_back(p);
+            }
         }
+        //printf("\n");
     }
 }
 
@@ -203,5 +215,6 @@ vector<LidarPoint> LidarKit::get_points()
 {
     scoped_lock lg(points_mtx);
 
+    //printf("sz %d\n",this->points.size());
     return move(this->points);
 }
