@@ -10,11 +10,6 @@
 #include <unistd.h>
 #include <vector>
 
-/*
- * g++ src/lidartest.cpp src/lidarkit.cpp src/util.cpp -I./include/
- *
- */
-
 using namespace std;
 
 const uint8_t crc_table[256] =
@@ -166,7 +161,6 @@ void LidarKit::thread_loop()
         double step = (end_angle >= start_angle)
                     ? (end_angle - start_angle) / (NUM_POINTS - 1)
                     : ((end_angle + 360.0) - start_angle) / (NUM_POINTS - 1);
-        //printf("[%5.2f:%5.2f ]",start_angle,step);
         // parse intermediate points
         for (size_t i = 0; i < NUM_POINTS; i++) {
             size_t j = 6 + 3*i;
@@ -181,7 +175,6 @@ void LidarKit::thread_loop()
             LidarPoint p(this_angle, this_dist, this_conf, timestamp);
             scoped_lock lg(points_mtx);
             if(this_angle < 360.0){
-                //printf("%05.2f:%4d ",this_angle,(int)this_dist_word);
             	this->points.push_back(p);
             }
         }
@@ -215,6 +208,5 @@ vector<LidarPoint> LidarKit::get_points()
 {
     scoped_lock lg(points_mtx);
 
-    //printf("sz %d\n",this->points.size());
     return move(this->points);
 }

@@ -18,7 +18,6 @@
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
-#include "include/rplidar.h" //RPLIDAR sdk
 #include <signal.h>
 #include <string.h>
 
@@ -26,7 +25,7 @@
 
 
 // Function to flag ctrl-c
-bool ctrl_c_pressed;
+bool ctrl_c_pressed = false;
 void ctrlc(int)
 {
     ctrl_c_pressed = true;
@@ -81,24 +80,6 @@ void line(int x1, int y1, int x2, int y2, float width, color c)
     glEnd();
 }
 
-/*
- * LIDAR HELPERS - from Slamtec LIDAR SDK example
- */
-
-#ifndef _countof
-#define _countof(_Array) (int)(sizeof(_Array) / sizeof(_Array[0]))
-#endif
-
-#include <unistd.h>
-static inline void delay(_word_size_t ms){
-    while (ms>=1000){
-        usleep(1000*1000);
-        ms-=1000;
-    };
-    if (ms!=0)
-        usleep(ms*1000);
-}
-
 int task();
 
 /*
@@ -106,8 +87,6 @@ int task();
  */
 
 // GLOBALS 
-u_result     op_result;
-
 extern LP_t lp[];
 
 // RENDER - Pull data from LIDAR and render to display
@@ -117,8 +96,10 @@ void renderScreen(void)
 
     for (int pos = 0; pos < (int)360 ; pos++)
     {
-        //if(lp[pos].confidence > 200)
-        	//c.b = lp[pos].confidence/200;
+        if(lp[pos].confidence > 150)
+        	c = BLUE;
+        else
+        	c = RED;
         point_polar(lp[pos].angle, lp[pos].distance, SCREENX/2, SCREENY/2, 2, c);
     }
     // Render
@@ -133,6 +114,7 @@ void renderScreen(void)
 // MAIN
 int main(int argc, char** argv)
 {
+    signal(SIGINT, ctrlc);
     // Initialize OpenGL and display
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_SINGLE |GLUT_RGB);
